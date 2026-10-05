@@ -1,0 +1,30 @@
+from datetime import datetime
+from enum import StrEnum
+
+from sqlalchemy import DateTime, Enum, Integer, String, func
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.core.database import Base
+
+
+class ListingStatus(StrEnum):
+    ACTIVE = "active"
+    SOLD = "sold"
+
+
+class Listing(Base):
+    __tablename__ = "listings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    set_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    set_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    theme: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    condition: Mapped[str] = mapped_column(String(32), default="used")
+    is_complete: Mapped[bool] = mapped_column(default=False)
+    has_box: Mapped[bool] = mapped_column(default=False)
+    has_manual: Mapped[bool] = mapped_column(default=False)
+    recommended_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[ListingStatus] = mapped_column(
+        Enum(ListingStatus), default=ListingStatus.ACTIVE
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
