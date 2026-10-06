@@ -75,6 +75,9 @@ Deze repository bevat een `vercel.json` met twee services binnen één Vercel-pr
 - `frontend`: Vite-build op `/`
 - `backend`: FastAPI op `/api/*`
 
+De backend heeft een expliciet Vercel-entrypoint in `backend/main.py` en dependencies in
+`backend/requirements.txt`.
+
 Importeer de repository in Vercel en laat de project-root op de repository-root staan.
 Vercel bouwt beide services samen. Voeg in de Vercel Project Settings de volgende
 environment variables toe voor de backend:
