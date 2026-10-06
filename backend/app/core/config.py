@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,3 +26,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+if os.getenv("VERCEL"):
+    settings.database_url = "sqlite:////tmp/legosell.db"
+    settings.upload_dir = Path("/tmp/legosell-uploads")

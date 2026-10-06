@@ -91,6 +91,10 @@ wijzigingen en uploads kunnen na een nieuwe deployment of een cold start verdwij
 Gebruik voor productie een externe PostgreSQL-database en object storage (bijvoorbeeld
 Vercel Blob) voordat je echte advertenties op Vercel opslaat.
 
+Als tijdelijke Vercel-compatibiliteit gebruikt de backend daar `/tmp` voor SQLite en
+uploads. Dit voorkomt startup-fouten, maar `/tmp` is eveneens tijdelijk en niet geschikt
+voor blijvende productiegegevens.
+
 ### Google AI Studio instellen
 
 Maak in [Google AI Studio](https://aistudio.google.com/app/apikey) een API-sleutel aan,
