@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ArrowLeft, BarChart3, CircleDollarSign, ExternalLink, ImagePlus, LayoutDashboard, PackagePlus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, CircleDollarSign, ExternalLink, ImagePlus, LayoutDashboard, LockKeyhole, LogOut, PackagePlus, Sparkles, Trash2 } from "lucide-react";
 
 type Listing = {
   id: number;
@@ -30,16 +30,61 @@ export default function App() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
 
   useEffect(() => {
-    fetch(`${apiUrl}/listings`)
+    fetch(`${apiUrl}/auth/me`, { credentials: "include" })
+      .then((response) => {
+        setAuthenticated(response.ok);
+      })
+      .catch((error: Error) => setMessage(error.message));
+  }, []);
+
+  async function login(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const response = await fetch(`${apiUrl}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.detail ?? "Inloggen is mislukt.");
+      }
+      setAuthenticated(true);
+      setLoginPassword("");
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Inloggen is mislukt.");
+    } finally {
+      setLoggingIn(false);
+    }
+  }
+
+  async function logout() {
+    await fetch(`${apiUrl}/auth/logout`, { method: "POST", credentials: "include" });
+    setAuthenticated(false);
+    setListings([]);
+    setSelectedListing(null);
+  }
+
+  useEffect(() => {
+    if (authenticated !== true) return;
+    fetch(`${apiUrl}/listings`, { credentials: "include" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Advertenties konden niet worden geladen.");
         return response.json() as Promise<Listing[]>;
       })
       .then(setListings)
       .catch((error: Error) => setMessage(error.message));
-  }, []);
+  }, [authenticated]);
 
   function handlePhotos(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files ?? []);
@@ -60,6 +105,7 @@ export default function App() {
     try {
       const response = await fetch(`${apiUrl}/listings`, {
         method: "POST",
+        credentials: "include",
         body: form,
       });
       if (!response.ok) {
@@ -77,7 +123,7 @@ export default function App() {
       } else if (analysisResponse.status === 503) {
         resultMessage = "Advertentie opgeslagen. AI is nog niet geconfigureerd.";
       }
-      const refreshedListings = await fetch(`${apiUrl}/listings`).then((result) => result.json() as Promise<Listing[]>);
+      const refreshedListings = await fetch(`${apiUrl}/listings`, { credentials: "include" }).then((result) => result.json() as Promise<Listing[]>);
       setListings(refreshedListings);
       setPhotos([]);
       setMessage(resultMessage);
@@ -97,11 +143,35 @@ export default function App() {
   const activeListings = listings.filter((listing) => listing.status === "active");
   const openPlatform = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
 
+  if (authenticated === null) {
+    return <div className="grid min-h-screen place-items-center bg-slate-50 text-slate-500">Laden...</div>;
+  }
+
+  if (!authenticated) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-slate-50 p-6">
+        <form onSubmit={login} className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+          <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-blue-600 text-white"><LockKeyhole size={26} /></div>
+          <h1 className="mt-6 text-center text-2xl font-bold">Welkom bij LegoSell AI</h1>
+          <p className="mt-2 text-center text-sm text-slate-500">Log in om je advertenties te beheren.</p>
+          <div className="mt-8 space-y-4">
+            <input value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} required placeholder="Gebruikersnaam" autoComplete="username" className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500" />
+            <input value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} required type="password" placeholder="Wachtwoord" autoComplete="current-password" className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500" />
+          </div>
+          {loginError && <p className="mt-4 text-sm text-red-600">{loginError}</p>}
+          <button disabled={loggingIn} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
+            <LockKeyhole size={17} /> {loggingIn ? "Inloggen..." : "Inloggen"}
+          </button>
+        </form>
+      </main>
+    );
+  }
+
   async function deleteListing() {
     if (!selectedListing || !window.confirm("Weet je zeker dat je deze advertentie wilt verwijderen?")) return;
     setDeleting(true);
     try {
-      const response = await fetch(`${apiUrl}/listings/${selectedListing.id}`, { method: "DELETE" });
+      const response = await fetch(`${apiUrl}/listings/${selectedListing.id}`, { method: "DELETE", credentials: "include" });
       if (!response.ok) {
         const error = await response.json().catch(() => null);
         throw new Error(error?.detail ?? "Verwijderen is mislukt.");
@@ -139,6 +209,7 @@ export default function App() {
         <header className="border-b border-slate-200 bg-white px-6 py-5 sm:px-10">
           <p className="text-sm font-medium text-blue-600">{showForm ? "Nieuwe advertentie" : "Overzicht"}</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight">{showForm ? "Advertentie toevoegen" : "Jouw LEGO advertenties"}</h1>
+          <button type="button" onClick={logout} className="mt-3 flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900"><LogOut size={16} /> Uitloggen</button>
         </header>
         <div className="mx-auto max-w-7xl space-y-8 p-6 sm:p-10">
           {!showForm && (

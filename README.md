@@ -99,11 +99,18 @@ kopieer `.env.example` naar `.env` en vul de sleutel in:
 ```dotenv
 GOOGLE_AI_API_KEY=je_google_ai_studio_sleutel
 GOOGLE_AI_MODEL=gemini-2.5-flash-lite
+AUTH_USERNAME=jouw gebruikersnaam
+AUTH_PASSWORD=een sterk wachtwoord
+AUTH_SECRET=een lange willekeurige geheime waarde
 ```
 
 De sleutel blijft uitsluitend in de backend. Foto's worden vanuit de backend naar de
 Google Gemini API gestuurd voor herkenning van het LEGO-setnummer, de naam, het thema
 en de conditie. Zet de sleutel nooit in de frontend of commit `.env` naar Git.
+
+De applicatie gebruikt een single-user login met een HttpOnly sessiecookie. Stel
+`AUTH_USERNAME`, `AUTH_PASSWORD` en een lange unieke `AUTH_SECRET` in bij Vercel.
+De frontend bevat ook een PWA-manifest en een LegoSell-favicon.
 
 ### Los starten
 

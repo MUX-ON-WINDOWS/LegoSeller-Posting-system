@@ -9,12 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.auth import require_auth
 from app.core.database import get_db
 from app.models.listing import Listing
 from app.schemas.listing import LegoCondition, ListingRead, RecognitionRead
 from app.services.ai_vision import AIConfigurationError, AIProviderError, analyze_images
 
-router = APIRouter(prefix="/listings", tags=["listings"])
+router = APIRouter(prefix="/listings", tags=["listings"], dependencies=[Depends(require_auth)])
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 

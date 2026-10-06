@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     google_ai_api_key: str | None = None
     google_ai_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     google_ai_model: str = "gemini-2.5-flash-lite"
+    auth_username: str = ""
+    auth_password: str = ""
+    auth_secret: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
