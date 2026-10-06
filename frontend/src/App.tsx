@@ -17,8 +17,9 @@ type Listing = {
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
 const apiUrl = (
-  configuredApiUrl
-  ?? (import.meta.env.PROD ? "/api" : `${window.location.protocol}//${window.location.hostname}:8000`)
+  import.meta.env.PROD
+    ? "/api"
+    : (configuredApiUrl ?? `${window.location.protocol}//${window.location.hostname}:8000`)
 ).replace(/\/+$/, "");
 const conditionLabels: Record<string, string> = { new: "Nieuw", excellent: "Uitstekend", good: "Goed", used: "Gebruikt" };
 
