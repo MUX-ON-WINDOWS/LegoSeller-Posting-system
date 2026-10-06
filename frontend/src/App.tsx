@@ -15,7 +15,11 @@ type Listing = {
   photos: string[];
 };
 
-const apiUrl = (import.meta.env.VITE_API_URL ?? `${window.location.protocol}//${window.location.hostname}:8000`).replace(/\/+$/, "");
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const apiUrl = (
+  configuredApiUrl
+  ?? (import.meta.env.PROD ? "/api" : `${window.location.protocol}//${window.location.hostname}:8000`)
+).replace(/\/+$/, "");
 const conditionLabels: Record<string, string> = { new: "Nieuw", excellent: "Uitstekend", good: "Goed", used: "Gebruikt" };
 
 export default function App() {

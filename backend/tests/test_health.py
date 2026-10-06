@@ -10,6 +10,13 @@ def test_health() -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_health_with_vercel_api_prefix() -> None:
+    response = TestClient(app).get("/api/health")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
 def test_cors_allows_private_network_frontend() -> None:
     response = TestClient(app).get(
         "/health",

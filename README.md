@@ -68,6 +68,29 @@ Stoppen kan met `Ctrl+C`.
 
 `npm start` gebruikt geen Docker en heeft geen extra globale npm-tools nodig.
 
+### Deployen met Vercel Services
+
+Deze repository bevat een `vercel.json` met twee services binnen één Vercel-project:
+
+- `frontend`: Vite-build op `/`
+- `backend`: FastAPI op `/api/*`
+
+Importeer de repository in Vercel en laat de project-root op de repository-root staan.
+Vercel bouwt beide services samen. Voeg in de Vercel Project Settings de volgende
+environment variables toe voor de backend:
+
+```text
+GOOGLE_AI_API_KEY
+GOOGLE_AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+GOOGLE_AI_MODEL=gemini-2.5-flash-lite
+```
+
+Vercel Functions hebben geen permanente lokale schijf. De huidige SQLite-database en
+`data/uploads` zijn geschikt voor lokaal gebruik, maar niet als permanente productieopslag:
+wijzigingen en uploads kunnen na een nieuwe deployment of een cold start verdwijnen.
+Gebruik voor productie een externe PostgreSQL-database en object storage (bijvoorbeeld
+Vercel Blob) voordat je echte advertenties op Vercel opslaat.
+
 ### Google AI Studio instellen
 
 Maak in [Google AI Studio](https://aistudio.google.com/app/apikey) een API-sleutel aan,
