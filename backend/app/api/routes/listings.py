@@ -4,6 +4,8 @@ from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -14,6 +16,39 @@ from app.services.ai_vision import AIConfigurationError, AIProviderError, analyz
 
 router = APIRouter(prefix="/listings", tags=["listings"])
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+def _photo_urls(listing_id: int) -> list[str]:
+    listing_dir = settings.upload_dir / str(listing_id)
+    if not listing_dir.exists():
+        return []
+    return [
+        f"/listings/{listing_id}/photos/{path.name}"
+        for path in sorted(listing_dir.iterdir())
+        if path.is_file()
+    ]
+
+
+def _listing_response(listing: Listing) -> dict[str, object]:
+    return {
+        "id": listing.id,
+        "set_number": listing.set_number,
+        "set_name": listing.set_name,
+        "condition": listing.condition,
+        "is_complete": listing.is_complete,
+        "has_box": listing.has_box,
+        "has_manual": listing.has_manual,
+        "recommended_price_cents": listing.recommended_price_cents,
+        "status": listing.status,
+        "theme": listing.theme,
+        "photos": _photo_urls(listing.id),
+    }
+
+
+@router.get("", response_model=list[ListingRead])
+def get_listings(db: Session = Depends(get_db)) -> list[dict[str, object]]:
+    listings = db.scalars(select(Listing).order_by(Listing.id.desc())).all()
+    return [_listing_response(listing) for listing in listings]
 
 
 @router.post("", response_model=ListingRead, status_code=status.HTTP_201_CREATED)
@@ -53,7 +88,29 @@ def create_listing(
         with destination.open("wb") as output:
             shutil.copyfileobj(photo.file, output)
 
-    return listing
+    return _listing_response(listing)
+
+
+@router.get("/{listing_id}/photos/{filename}")
+def get_listing_photo(listing_id: int, filename: str) -> FileResponse:
+    listing_dir = settings.upload_dir / str(listing_id)
+    photo_path = listing_dir / filename
+    if not photo_path.is_file() or photo_path.parent != listing_dir:
+        raise HTTPException(status_code=404, detail="Foto niet gevonden.")
+    return FileResponse(photo_path)
+
+
+@router.delete("/{listing_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_listing(listing_id: int, db: Session = Depends(get_db)) -> None:
+    listing = db.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Advertentie niet gevonden.")
+
+    listing_dir = settings.upload_dir / str(listing_id)
+    db.delete(listing)
+    db.commit()
+    if listing_dir.exists():
+        shutil.rmtree(listing_dir)
 
 
 @router.post("/{listing_id}/analyze", response_model=RecognitionRead)
@@ -72,7 +129,10 @@ async def analyze_listing(listing_id: int, db: Session = Depends(get_db)) -> Rec
     except httpx.HTTPError as error:
         raise HTTPException(
             status_code=502,
-            detail="AI-provider kon niet worden bereikt. Controleer internet, proxy en AI_BASE_URL.",
+            detail=(
+                "Google AI Studio kon niet worden bereikt. Controleer internet, "
+                "proxy en GOOGLE_AI_BASE_URL."
+            ),
         ) from error
 
     listing.set_number = recognition.set_number or listing.set_number

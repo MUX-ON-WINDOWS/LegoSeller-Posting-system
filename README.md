@@ -68,6 +68,20 @@ Stoppen kan met `Ctrl+C`.
 
 `npm start` gebruikt geen Docker en heeft geen extra globale npm-tools nodig.
 
+### Google AI Studio instellen
+
+Maak in [Google AI Studio](https://aistudio.google.com/app/apikey) een API-sleutel aan,
+kopieer `.env.example` naar `.env` en vul de sleutel in:
+
+```dotenv
+GOOGLE_AI_API_KEY=je_google_ai_studio_sleutel
+GOOGLE_AI_MODEL=gemini-2.5-flash-lite
+```
+
+De sleutel blijft uitsluitend in de backend. Foto's worden vanuit de backend naar de
+Google Gemini API gestuurd voor herkenning van het LEGO-setnummer, de naam, het thema
+en de conditie. Zet de sleutel nooit in de frontend of commit `.env` naar Git.
+
 ### Los starten
 
 Frontend:
@@ -87,18 +101,20 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 --app-dir bac
 
 - De app draait volledig lokaal; uploads worden in `data/uploads` opgeslagen.
 - `npm start` gebruikt geen Docker en start de React- en FastAPI-processen naast elkaar.
-- `VisionProvider` is een interface. De eerste versie gebruikt een veilige placeholder en kan later worden gekoppeld aan een lokaal vision-model.
+- De AI-herkenning gebruikt Google AI Studio via de Gemini `generateContent` API.
+- Het dashboard toont opgeslagen advertenties met foto's en biedt knoppen naar de nieuwe-advertentiepagina's van Vinted en Marktplaats. De uiteindelijke plaatsing blijft handmatig; beide platforms vereisen hiervoor een ingelogd account.
 - Prijsadvies en advertentieteksten zitten achter services, zodat deze domeinlogica onafhankelijk van HTTP en UI getest kan worden.
 - Alle API-modellen zijn expliciet getypeerd met Pydantic.
-- De frontend gebruikt automatisch dezelfde hostnaam voor de API. Daardoor werkt de app ook via een lokaal netwerkadres, zoals een Tailscale-adres.
+- De frontend gebruikt automatisch dezelfde hostnaam voor de API. Daardoor werkt de app ook via een lokaal netwerkadres, zoals een `10.x`, `192.168.x`, `172.16-31.x` of Tailscale-adres. De ontwikkel-API staat deze private netwerk-origins standaard toe via CORS.
 
 ### AI-herkenning
 
-De huidige versie slaat foto’s lokaal op en maakt de advertentiegegevens aan. De daadwerkelijke LEGO-herkenning, OCR van tekst op dozen en herkenning van setnummer/setnaam zijn nog niet aangesloten. Daarvoor moet de `VisionProvider` in `backend/app/services/vision.py` worden gekoppeld aan een lokaal vision/OCR-model.
+De app slaat foto's lokaal op en stuurt ze bij analyse vanuit de backend naar Google AI
+Studio. OCR van tekst op dozen en herkenning van setnummer/setnaam gebeurt door Gemini.
 
 ## Volgende stappen
 
 1. Foto-upload en opslag toevoegen.
-2. LEGO-herkenning koppelen aan een lokale of configureerbare AI-provider.
+2. Google AI Studio verder uitbreiden met prijsadvies en advertentiegeneratie.
 3. Prijsadvies en Marktplaats/Vinted-generatie implementeren.
 4. Advertenties opslaan en dashboardstatistieken vullen.
