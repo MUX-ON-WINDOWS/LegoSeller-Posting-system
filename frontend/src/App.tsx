@@ -7,6 +7,7 @@ type Listing = {
   set_number: string | null;
   set_name: string | null;
   theme: string | null;
+  description: string | null;
   condition: string;
   is_complete: boolean;
   has_box: boolean;
@@ -22,6 +23,21 @@ const apiUrl = (
     : (configuredApiUrl ?? `${window.location.protocol}//${window.location.hostname}:8000`)
 ).replace(/\/+$/, "");
 const conditionLabels: Record<string, string> = { new: "Nieuw", excellent: "Uitstekend", good: "Goed", used: "Gebruikt" };
+
+async function optimizePhoto(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file);
+  const maxDimension = 1600;
+  const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+  if (!blob) throw new Error(`Foto optimaliseren is mislukt: ${file.name}`);
+  return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, { type: "image/jpeg" });
+}
 
 export default function App() {
   const [showForm, setShowForm] = useState(false);
@@ -101,9 +117,10 @@ export default function App() {
       return;
     }
     setSaving(true);
-    const form = new FormData(formElement);
-    photos.forEach((photo) => form.append("photos", photo));
     try {
+      const optimizedPhotos = await Promise.all(photos.map(optimizePhoto));
+      const form = new FormData(formElement);
+      optimizedPhotos.forEach((photo) => form.append("photos", photo));
       const response = await fetch(`${apiUrl}/listings`, {
         method: "POST",
         credentials: "include",
@@ -115,7 +132,10 @@ export default function App() {
       }
       const listing = await response.json();
       let resultMessage = "Advertentie opgeslagen.";
-      const analysisResponse = await fetch(`${apiUrl}/listings/${listing.id}/analyze`, { method: "POST" });
+      const analysisResponse = await fetch(`${apiUrl}/listings/${listing.id}/analyze`, {
+        method: "POST",
+        credentials: "include",
+      });
       if (analysisResponse.ok) {
         const recognition = await analysisResponse.json();
         resultMessage = recognition.set_number
@@ -123,6 +143,9 @@ export default function App() {
           : "Advertentie opgeslagen. Geen setnummer betrouwbaar herkend.";
       } else if (analysisResponse.status === 503) {
         resultMessage = "Advertentie opgeslagen. AI is nog niet geconfigureerd.";
+      } else {
+        const analysisError = await analysisResponse.json().catch(() => null);
+        resultMessage = `Advertentie opgeslagen. AI-analyse mislukt: ${analysisError?.detail ?? `HTTP ${analysisResponse.status}`}`;
       }
       const refreshedListings = await fetch(`${apiUrl}/listings`, { credentials: "include" }).then((result) => result.json() as Promise<Listing[]>);
       setListings(refreshedListings);
@@ -239,8 +262,8 @@ export default function App() {
                 <label className="rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center hover:border-blue-400">
                   <ImagePlus className="mx-auto text-blue-600" size={30} />
                   <span className="mt-3 block font-semibold">Foto&apos;s toevoegen</span>
-                  <span className="mt-1 block text-sm text-slate-500">1 tot 20 JPG, PNG of WebP-bestanden</span>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handlePhotos} className="sr-only" />
+                  <span className="mt-1 block text-sm text-slate-500">1 tot 20 foto&apos;s; mobiel maakt ze automatisch kleiner</span>
+                  <input type="file" accept="image/*" multiple onChange={handlePhotos} className="sr-only" />
                   {photos.length > 0 && <span className="mt-4 block text-sm font-medium text-blue-700">{photos.length} foto&apos;s geselecteerd</span>}
                 </label>
                 <div className="space-y-4">
@@ -275,6 +298,12 @@ export default function App() {
                     <div>
                       <p className="text-sm font-medium text-blue-600">{selectedListing.theme ?? "LEGO"} {selectedListing.set_number && `• ${selectedListing.set_number}`}</p>
                       <h2 className="mt-2 text-2xl font-bold">{selectedListing.set_name ?? "Onbenoemde LEGO-set"}</h2>
+                                      {selectedListing.description && (
+                                        <div className="mt-6 rounded-xl bg-slate-50 p-4">
+                                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">AI-beschrijving</p>
+                                          <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{selectedListing.description}</p>
+                                        </div>
+                                      )}
                       <dl className="mt-6 space-y-3 text-sm">
                         <div className="flex justify-between border-b border-slate-100 pb-3"><dt className="text-slate-500">Conditie</dt><dd className="font-medium">{conditionLabels[selectedListing.condition] ?? selectedListing.condition}</dd></div>
                         <div className="flex justify-between border-b border-slate-100 pb-3"><dt className="text-slate-500">Compleet</dt><dd className="font-medium">{selectedListing.is_complete ? "Ja" : "Nee"}</dd></div>

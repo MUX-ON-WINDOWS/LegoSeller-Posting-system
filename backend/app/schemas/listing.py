@@ -26,6 +26,7 @@ class ListingRead(ListingCreate):
     status: str
     recommended_price_cents: int | None = None
     theme: str | None = None
+    description: str | None = None
     photos: list[str] = Field(default_factory=list)
 
 
@@ -34,3 +35,4 @@ class RecognitionRead(BaseModel):
     set_name: str | None = None
     theme: str | None = None
     condition: str | None = None
+    description: str | None = None

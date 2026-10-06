@@ -42,6 +42,7 @@ def _listing_response(listing: Listing) -> dict[str, object]:
         "recommended_price_cents": listing.recommended_price_cents,
         "status": listing.status,
         "theme": listing.theme,
+        "description": listing.description,
         "photos": _photo_urls(listing.id),
     }
 
@@ -139,6 +140,7 @@ async def analyze_listing(listing_id: int, db: Session = Depends(get_db)) -> Rec
     listing.set_number = recognition.set_number or listing.set_number
     listing.set_name = recognition.set_name or listing.set_name
     listing.theme = recognition.theme
+    listing.description = recognition.description
     if recognition.condition in {item.value for item in LegoCondition}:
         listing.condition = recognition.condition
     db.commit()

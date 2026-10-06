@@ -38,8 +38,12 @@ async def analyze_images(image_paths: list[Path]) -> LegoRecognition:
             "text": (
                 "Analyseer deze LEGO-foto's. Lees zichtbare tekst op dozen of handleidingen "
                 "met OCR. Geef uitsluitend JSON terug met de velden set_number, set_name, "
-                "theme en condition. Gebruik null als iets niet betrouwbaar herkenbaar is. "
-                "condition moet new, excellent, good of used zijn."
+                "theme, condition en description. Gebruik null als iets niet betrouwbaar "
+                "herkenbaar is. condition moet new, excellent, good of used zijn. "
+                "Schrijf description in het Nederlands als een aantrekkelijke maar eerlijke "
+                "Marktplaats/Vinted-advertentietekst van maximaal 600 tekens. Vermeld alleen "
+                "feiten die uit de foto's of de opdracht blijken en verzin geen accessoires, "
+                "compleetheid of staat."
             )
         }
     ]
@@ -89,4 +93,5 @@ async def analyze_images(image_paths: list[Path]) -> LegoRecognition:
         set_name=result.get("set_name"),
         theme=result.get("theme"),
         condition=result.get("condition"),
+        description=result.get("description"),
     )

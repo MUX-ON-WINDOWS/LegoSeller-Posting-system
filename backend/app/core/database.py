@@ -34,3 +34,6 @@ def init_db() -> None:
         if "theme" not in columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE listings ADD COLUMN theme VARCHAR(100)"))
+        if "description" not in columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE listings ADD COLUMN description VARCHAR(4000)"))

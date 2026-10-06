@@ -8,6 +8,7 @@ class LegoRecognition:
     set_name: str | None = None
     theme: str | None = None
     condition: str | None = None
+    description: str | None = None
 
 
 class VisionProvider:

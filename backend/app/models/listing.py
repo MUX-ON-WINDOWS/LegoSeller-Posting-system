@@ -19,6 +19,7 @@ class Listing(Base):
     set_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
     set_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     theme: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(4000), nullable=True)
     condition: Mapped[str] = mapped_column(String(32), default="used")
     is_complete: Mapped[bool] = mapped_column(default=False)
     has_box: Mapped[bool] = mapped_column(default=False)
