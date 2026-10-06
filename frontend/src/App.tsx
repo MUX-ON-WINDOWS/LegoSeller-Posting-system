@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ArrowLeft, BarChart3, CircleDollarSign, ExternalLink, ImagePlus, LayoutDashboard, LockKeyhole, LogOut, PackagePlus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, Check, CircleDollarSign, Copy, ExternalLink, ImagePlus, LayoutDashboard, LockKeyhole, LogOut, PackagePlus, Sparkles, Trash2 } from "lucide-react";
 
 type Listing = {
   id: number;
@@ -52,6 +52,7 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
+  const [copiedDescription, setCopiedDescription] = useState(false);
 
   useEffect(() => {
     fetch(`${apiUrl}/auth/me`, { credentials: "include" })
@@ -90,6 +91,27 @@ export default function App() {
     setAuthenticated(false);
     setListings([]);
     setSelectedListing(null);
+  }
+
+  async function copyDescription(description: string) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(description);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = description;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        textArea.remove();
+      }
+      setCopiedDescription(true);
+      window.setTimeout(() => setCopiedDescription(false), 2000);
+    } catch {
+      setMessage("Beschrijving kopiëren is mislukt.");
+    }
   }
 
   useEffect(() => {
@@ -300,7 +322,17 @@ export default function App() {
                       <h2 className="mt-2 text-2xl font-bold">{selectedListing.set_name ?? "Onbenoemde LEGO-set"}</h2>
                                       {selectedListing.description && (
                                         <div className="mt-6 rounded-xl bg-slate-50 p-4">
-                                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">AI-beschrijving</p>
+                                          <div className="flex items-center justify-between gap-3">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">AI-beschrijving</p>
+                                            <button
+                                              type="button"
+                                              onClick={() => copyDescription(selectedListing.description!)}
+                                              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-700"
+                                            >
+                                              {copiedDescription ? <Check size={14} /> : <Copy size={14} />}
+                                              {copiedDescription ? "Gekopieerd" : "Kopiëren"}
+                                            </button>
+                                          </div>
                                           <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{selectedListing.description}</p>
                                         </div>
                                       )}
