@@ -26,8 +26,23 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-if not os.getenv("DATABASE_URL") and os.getenv("POSTGRES_URL"):
-    settings.database_url = os.environ["POSTGRES_URL"]
+if os.getenv("VERCEL"):
+    database_url = next(
+        (
+            os.getenv(name)
+            for name in (
+                "DATABASE_URL",
+                "POSTGRES_URL",
+                "POSTGRES_PRISMA_URL",
+                "POSTGRES_URL_NON_POOLING",
+                "DATABASE_URL_UNPOOLED",
+            )
+            if os.getenv(name)
+        ),
+        None,
+    )
+    if database_url:
+        settings.database_url = database_url
 if settings.database_url.startswith("postgres://"):
     settings.database_url = settings.database_url.replace("postgres://", "postgresql+psycopg://", 1)
 elif settings.database_url.startswith("postgresql://"):
@@ -36,6 +51,6 @@ elif settings.database_url.startswith("postgresql://"):
     )
 if os.getenv("VERCEL") and not settings.database_url.startswith("postgresql+psycopg://"):
     raise RuntimeError(
-        "Persistentie vereist op Vercel: configureer DATABASE_URL of POSTGRES_URL "
-        "met een PostgreSQL-database."
+        "Persistentie vereist op Vercel: configureer DATABASE_URL, POSTGRES_URL "
+        "of een Vercel/Neon PostgreSQL-variabele."
     )
