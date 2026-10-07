@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     auth_username: str = ""
     auth_password: str = ""
     auth_secret: str = ""
+    persistent_storage_configured: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -65,8 +66,6 @@ elif settings.database_url.startswith("postgresql://"):
     settings.database_url = settings.database_url.replace(
         "postgresql://", "postgresql+psycopg://", 1
     )
-if os.getenv("VERCEL") and not settings.database_url.startswith("postgresql+psycopg://"):
-    raise RuntimeError(
-        "Persistente opslag vereist op Vercel: configureer DATABASE_URL, POSTGRES_URL "
-        "of een Vercel/Neon PostgreSQL-variabele. Tijdelijke SQLite-opslag is uitgeschakeld."
-    )
+settings.persistent_storage_configured = not os.getenv("VERCEL") or settings.database_url.startswith(
+    "postgresql+psycopg://"
+)

@@ -1,5 +1,6 @@
 from collections.abc import Generator
 
+from fastapi import HTTPException, status
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -20,11 +21,21 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def get_db() -> Generator[Session, None, None]:
+    if not settings.persistent_storage_configured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Persistente opslag is niet geconfigureerd. Voeg DATABASE_URL of POSTGRES_URL "
+                "met een PostgreSQL-database toe aan de Vercel Environment Variables."
+            ),
+        )
     with SessionLocal() as session:
         yield session
 
 
 def init_db() -> None:
+    if not settings.persistent_storage_configured:
+        return
     from app.models import listing  # noqa: F401
 
     if settings.database_url.startswith("sqlite:///"):
