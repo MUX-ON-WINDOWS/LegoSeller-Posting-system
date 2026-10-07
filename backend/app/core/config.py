@@ -74,6 +74,8 @@ if os.getenv("VERCEL"):
             )
     if database_url:
         settings.database_url = database_url
+    else:
+        settings.database_url = "sqlite:///./data/legosell.db"
 if settings.database_url.startswith("postgres://"):
     settings.database_url = settings.database_url.replace("postgres://", "postgresql+psycopg://", 1)
 elif settings.database_url.startswith("postgresql://"):

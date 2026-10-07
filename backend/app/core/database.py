@@ -16,11 +16,16 @@ class Base(DeclarativeBase):
 
 
 connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(
-    settings.database_url,
-    connect_args=connect_args,
-    pool_pre_ping=True,
-)
+try:
+    engine = create_engine(
+        settings.database_url,
+        connect_args=connect_args,
+        pool_pre_ping=True,
+    )
+except SQLAlchemyError:
+    logger.exception("Databaseconfiguratie is ongeldig; authenticatie blijft beschikbaar.")
+    settings.persistent_storage_configured = False
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 database_available = False
 
