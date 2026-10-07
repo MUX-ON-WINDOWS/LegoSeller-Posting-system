@@ -66,5 +66,7 @@ elif settings.database_url.startswith("postgresql://"):
         "postgresql://", "postgresql+psycopg://", 1
     )
 if os.getenv("VERCEL") and not settings.database_url.startswith("postgresql+psycopg://"):
-    settings.database_url = "sqlite:////tmp/legosell.db"
-    settings.upload_dir = Path("/tmp/legosell-uploads")
+    raise RuntimeError(
+        "Persistente opslag vereist op Vercel: configureer DATABASE_URL, POSTGRES_URL "
+        "of een Vercel/Neon PostgreSQL-variabele. Tijdelijke SQLite-opslag is uitgeschakeld."
+    )
