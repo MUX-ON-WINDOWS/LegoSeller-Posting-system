@@ -26,6 +26,16 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-if os.getenv("VERCEL"):
-    settings.database_url = "sqlite:////tmp/legosell.db"
-    settings.upload_dir = Path("/tmp/legosell-uploads")
+if not os.getenv("DATABASE_URL") and os.getenv("POSTGRES_URL"):
+    settings.database_url = os.environ["POSTGRES_URL"]
+if settings.database_url.startswith("postgres://"):
+    settings.database_url = settings.database_url.replace("postgres://", "postgresql+psycopg://", 1)
+elif settings.database_url.startswith("postgresql://"):
+    settings.database_url = settings.database_url.replace(
+        "postgresql://", "postgresql+psycopg://", 1
+    )
+if os.getenv("VERCEL") and not settings.database_url.startswith("postgresql+psycopg://"):
+    raise RuntimeError(
+        "Persistentie vereist op Vercel: configureer DATABASE_URL of POSTGRES_URL "
+        "met een PostgreSQL-database."
+    )

@@ -1,17 +1,18 @@
 import shutil
+import tempfile
 from pathlib import Path
 from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.auth import require_auth
+from app.core.config import settings
 from app.core.database import get_db
-from app.models.listing import Listing
+from app.models.listing import Listing, ListingPhoto
 from app.schemas.listing import LegoCondition, ListingPricesUpdate, ListingRead, RecognitionRead
 from app.services.ai_vision import AIConfigurationError, AIProviderError, analyze_images
 
@@ -19,7 +20,12 @@ router = APIRouter(prefix="/listings", tags=["listings"], dependencies=[Depends(
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
-def _photo_urls(listing_id: int) -> list[str]:
+def _photo_urls(listing_id: int, db: Session) -> list[str]:
+    photos = db.scalars(
+        select(ListingPhoto).where(ListingPhoto.listing_id == listing_id).order_by(ListingPhoto.id)
+    ).all()
+    if photos:
+        return [f"/listings/{listing_id}/photos/{photo.id}" for photo in photos]
     listing_dir = settings.upload_dir / str(listing_id)
     if not listing_dir.exists():
         return []
@@ -30,7 +36,7 @@ def _photo_urls(listing_id: int) -> list[str]:
     ]
 
 
-def _listing_response(listing: Listing) -> dict[str, object]:
+def _listing_response(listing: Listing, db: Session) -> dict[str, object]:
     return {
         "id": listing.id,
         "set_number": listing.set_number,
@@ -46,14 +52,14 @@ def _listing_response(listing: Listing) -> dict[str, object]:
         "status": listing.status,
         "theme": listing.theme,
         "description": listing.description,
-        "photos": _photo_urls(listing.id),
+        "photos": _photo_urls(listing.id, db),
     }
 
 
 @router.get("", response_model=list[ListingRead])
 def get_listings(db: Session = Depends(get_db)) -> list[dict[str, object]]:
     listings = db.scalars(select(Listing).order_by(Listing.id.desc())).all()
-    return [_listing_response(listing) for listing in listings]
+    return [_listing_response(listing, db) for listing in listings]
 
 
 @router.post("", response_model=ListingRead, status_code=status.HTTP_201_CREATED)
@@ -83,21 +89,35 @@ def create_listing(
     db.commit()
     db.refresh(listing)
 
-    listing_dir = settings.upload_dir / str(listing.id)
-    listing_dir.mkdir(parents=True, exist_ok=True)
     for photo in uploaded_photos:
         if photo.content_type not in ALLOWED_IMAGE_TYPES:
             raise HTTPException(status_code=400, detail=f"Ongeldig bestandstype: {photo.filename}.")
         extension = Path(photo.filename or "").suffix.lower()
-        destination = listing_dir / f"{uuid4().hex}{extension}"
-        with destination.open("wb") as output:
-            shutil.copyfileobj(photo.file, output)
+        db.add(
+            ListingPhoto(
+                listing_id=listing.id,
+                filename=f"{uuid4().hex}{extension}",
+                content_type=photo.content_type,
+                data=photo.file.read(),
+            )
+        )
+    db.commit()
 
-    return _listing_response(listing)
+    return _listing_response(listing, db)
 
 
 @router.get("/{listing_id}/photos/{filename}")
-def get_listing_photo(listing_id: int, filename: str) -> FileResponse:
+def get_listing_photo(listing_id: int, filename: str, db: Session = Depends(get_db)) -> Response:
+    if filename.isdigit():
+        photo = db.scalar(
+            select(ListingPhoto).where(
+                ListingPhoto.id == int(filename), ListingPhoto.listing_id == listing_id
+            )
+        )
+        if photo is None:
+            raise HTTPException(status_code=404, detail="Foto niet gevonden.")
+        return Response(content=photo.data, media_type=photo.content_type)
+
     listing_dir = settings.upload_dir / str(listing_id)
     photo_path = listing_dir / filename
     if not photo_path.is_file() or photo_path.parent != listing_dir:
@@ -111,9 +131,10 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db)) -> None:
     if listing is None:
         raise HTTPException(status_code=404, detail="Advertentie niet gevonden.")
 
-    listing_dir = settings.upload_dir / str(listing_id)
+    db.query(ListingPhoto).filter(ListingPhoto.listing_id == listing_id).delete()
     db.delete(listing)
     db.commit()
+    listing_dir = settings.upload_dir / str(listing_id)
     if listing_dir.exists():
         shutil.rmtree(listing_dir)
 
@@ -133,7 +154,7 @@ def update_listing_prices(
     listing.recommended_price_cents = prices.vinted_price_cents
     db.commit()
     db.refresh(listing)
-    return _listing_response(listing)
+    return _listing_response(listing, db)
 
 
 @router.post("/{listing_id}/analyze", response_model=RecognitionRead)
@@ -141,8 +162,21 @@ async def analyze_listing(listing_id: int, db: Session = Depends(get_db)) -> Rec
     listing = db.get(Listing, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Advertentie niet gevonden.")
-    listing_dir = settings.upload_dir / str(listing_id)
-    image_paths = [path for path in listing_dir.iterdir() if path.is_file()]
+    photos = db.scalars(
+        select(ListingPhoto).where(ListingPhoto.listing_id == listing_id).order_by(ListingPhoto.id)
+    ).all()
+    temporary_paths: list[Path] = []
+    if photos:
+        for photo in photos:
+            with tempfile.NamedTemporaryFile(
+                suffix=Path(photo.filename).suffix, delete=False
+            ) as temporary_file:
+                temporary_file.write(photo.data)
+                temporary_paths.append(Path(temporary_file.name))
+        image_paths = temporary_paths
+    else:
+        listing_dir = settings.upload_dir / str(listing_id)
+        image_paths = [path for path in listing_dir.iterdir() if path.is_file()]
     try:
         recognition = await analyze_images(image_paths)
     except AIConfigurationError as error:
@@ -157,6 +191,9 @@ async def analyze_listing(listing_id: int, db: Session = Depends(get_db)) -> Rec
                 "proxy en GOOGLE_AI_BASE_URL."
             ),
         ) from error
+    finally:
+        for path in temporary_paths:
+            path.unlink(missing_ok=True)
 
     listing.set_number = recognition.set_number or listing.set_number
     listing.set_name = recognition.set_name or listing.set_name

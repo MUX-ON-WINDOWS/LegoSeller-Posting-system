@@ -88,15 +88,29 @@ GOOGLE_AI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 GOOGLE_AI_MODEL=gemini-2.5-flash-lite
 ```
 
-Vercel Functions hebben geen permanente lokale schijf. De huidige SQLite-database en
-`data/uploads` zijn geschikt voor lokaal gebruik, maar niet als permanente productieopslag:
-wijzigingen en uploads kunnen na een nieuwe deployment of een cold start verdwijnen.
-Gebruik voor productie een externe PostgreSQL-database en object storage (bijvoorbeeld
-Vercel Blob) voordat je echte advertenties op Vercel opslaat.
+Vercel Functions hebben geen permanente lokale schijf. Daarom ondersteunt de backend
+voor productie een externe PostgreSQL-database via `DATABASE_URL` of `POSTGRES_URL`.
+Advertenties en de bijbehorende foto's worden daarin opgeslagen, zodat ze blijven bestaan
+na een nieuwe deployment, cold start of het afsluiten van je apparaat. Foto's worden als
+databasegegevens opgeslagen; hiervoor is geen aparte Vercel Blob-configuratie nodig.
 
-Als tijdelijke Vercel-compatibiliteit gebruikt de backend daar `/tmp` voor SQLite en
-uploads. Dit voorkomt startup-fouten, maar `/tmp` is eveneens tijdelijk en niet geschikt
-voor blijvende productiegegevens.
+Maak in Vercel een PostgreSQL-database aan via de Marketplace (bijvoorbeeld Neon) en
+koppel die aan dit project. Controleer daarna bij Project Settings → Environment Variables
+dat `POSTGRES_URL` of `DATABASE_URL` aanwezig is voor Production en Preview. De URL moet
+de PostgreSQL-verbinding bevatten, bijvoorbeeld:
+
+```text
+postgresql://user:password@host/database?sslmode=require
+```
+
+Na een redeploy maakt de backend automatisch de tabellen aan. De bestaande gegevens die
+alleen in de oude `/tmp`-database stonden kunnen niet worden teruggehaald; die tijdelijke
+schijf wordt door Vercel gewist. Nieuwe advertenties worden vanaf dat moment permanent
+opgeslagen in PostgreSQL.
+
+Als er lokaal geen PostgreSQL-variabele is ingesteld, blijft de lokale SQLite-database
+(`data/legosell.db`) actief. Op Vercel start de backend bewust niet zonder PostgreSQL,
+zodat er nooit ongemerkt nieuwe gegevens op tijdelijke opslag terechtkomen.
 
 ### Google AI Studio instellen
 
