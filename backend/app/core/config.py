@@ -30,29 +30,43 @@ class Settings(BaseSettings):
 settings = Settings()
 if os.getenv("VERCEL"):
     prefix = "POSTGRES_PRISMA_"
-    database_url = next(
-        (
-            os.getenv(name)
-            for name in (
-                "DATABASE_URL",
-                "POSTGRES_URL",
-                "POSTGRES_PRISMA_URL",
-                "POSTGRES_URL_NON_POOLING",
-                "DATABASE_URL_UNPOOLED",
-                "POSTGRES_PRISMA_POSTGRES_URL",
-                "POSTGRES_PRISMA_POSTGRES_URL_NON_POOLING",
-                "POSTGRES_PRISMA_DATABASE_URL",
-                "POSTGRES_PRISMA_DATABASE_URL_UNPOOLED",
-            )
-            if os.getenv(name)
-        ),
-        None,
-    )
+    database_url = None
+    for name in (
+        "DATABASE_URL",
+        "POSTGRES_URL",
+        "POSTGRES_URL_NON_POOLING",
+        "DATABASE_URL_UNPOOLED",
+        "POSTGRES_PRISMA_POSTGRES_URL_NON_POOLING",
+        "POSTGRES_PRISMA_DATABASE_URL_UNPOOLED",
+        "POSTGRES_PRISMA_POSTGRES_URL",
+        "POSTGRES_PRISMA_DATABASE_URL",
+        "POSTGRES_PRISMA_URL",
+    ):
+        candidate = os.getenv(name, "").strip()
+        if candidate.startswith(("postgres://", "postgresql://")):
+            database_url = candidate
+            break
     if not database_url:
-        host = os.getenv(f"{prefix}PGHOST") or os.getenv("PGHOST")
-        user = os.getenv(f"{prefix}PGUSER") or os.getenv("PGUSER")
-        password = os.getenv(f"{prefix}PGPASSWORD") or os.getenv("PGPASSWORD")
-        database = os.getenv(f"{prefix}PGDATABASE") or os.getenv("PGDATABASE")
+        host = (
+            os.getenv(f"{prefix}PGHOST")
+            or os.getenv(f"{prefix}POSTGRES_HOST")
+            or os.getenv("PGHOST")
+        )
+        user = (
+            os.getenv(f"{prefix}PGUSER")
+            or os.getenv(f"{prefix}POSTGRES_USER")
+            or os.getenv("PGUSER")
+        )
+        password = (
+            os.getenv(f"{prefix}PGPASSWORD")
+            or os.getenv(f"{prefix}POSTGRES_PASSWORD")
+            or os.getenv("PGPASSWORD")
+        )
+        database = (
+            os.getenv(f"{prefix}PGDATABASE")
+            or os.getenv(f"{prefix}POSTGRES_DATABASE")
+            or os.getenv("PGDATABASE")
+        )
         if host and user and password and database:
             database_url = (
                 f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}"
