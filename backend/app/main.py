@@ -11,7 +11,8 @@ from app.core.database import init_db
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
-    settings.upload_dir.mkdir(parents=True, exist_ok=True)
+    if settings.persistent_storage_configured:
+        settings.upload_dir.mkdir(parents=True, exist_ok=True)
     yield
 
 

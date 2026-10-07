@@ -1,10 +1,14 @@
+import logging
 from collections.abc import Generator
 
 from fastapi import HTTPException, status
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -18,15 +22,16 @@ engine = create_engine(
     pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+database_available = False
 
 
 def get_db() -> Generator[Session, None, None]:
-    if not settings.persistent_storage_configured:
+    if not settings.persistent_storage_configured or not database_available:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Persistente opslag is niet geconfigureerd. Voeg DATABASE_URL of POSTGRES_URL "
-                "met een PostgreSQL-database toe aan de Vercel Environment Variables."
+                "De database is niet beschikbaar. Controleer DATABASE_URL of POSTGRES_URL "
+                "en de verbinding met de PostgreSQL-database."
             ),
         )
     with SessionLocal() as session:
@@ -34,25 +39,31 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
+    global database_available
     if not settings.persistent_storage_configured:
         return
-    from app.models import listing  # noqa: F401
+    try:
+        from app.models import listing  # noqa: F401
 
-    if settings.database_url.startswith("sqlite:///"):
-        database_path = settings.database_url.removeprefix("sqlite:///")
-        from pathlib import Path
+        if settings.database_url.startswith("sqlite:///"):
+            database_path = settings.database_url.removeprefix("sqlite:///")
+            from pathlib import Path
 
-        Path(database_path).parent.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(bind=engine)
-    if "listings" in inspect(engine).get_table_names():
-        columns = {column["name"] for column in inspect(engine).get_columns("listings")}
-        if "theme" not in columns:
-            with engine.begin() as connection:
-                connection.execute(text("ALTER TABLE listings ADD COLUMN theme VARCHAR(100)"))
-        if "description" not in columns:
-            with engine.begin() as connection:
-                connection.execute(text("ALTER TABLE listings ADD COLUMN description VARCHAR(4000)"))
-        for column in ("retail_price_cents", "vinted_price_cents", "marktplaats_price_cents"):
-            if column not in columns:
+            Path(database_path).parent.mkdir(parents=True, exist_ok=True)
+        Base.metadata.create_all(bind=engine)
+        if "listings" in inspect(engine).get_table_names():
+            columns = {column["name"] for column in inspect(engine).get_columns("listings")}
+            if "theme" not in columns:
                 with engine.begin() as connection:
-                    connection.execute(text(f"ALTER TABLE listings ADD COLUMN {column} INTEGER"))
+                    connection.execute(text("ALTER TABLE listings ADD COLUMN theme VARCHAR(100)"))
+            if "description" not in columns:
+                with engine.begin() as connection:
+                    connection.execute(text("ALTER TABLE listings ADD COLUMN description VARCHAR(4000)"))
+            for column in ("retail_price_cents", "vinted_price_cents", "marktplaats_price_cents"):
+                if column not in columns:
+                    with engine.begin() as connection:
+                        connection.execute(text(f"ALTER TABLE listings ADD COLUMN {column} INTEGER"))
+        database_available = True
+    except SQLAlchemyError:
+        database_available = False
+        logger.exception("Database initialisatie mislukt; authenticatie blijft beschikbaar.")
