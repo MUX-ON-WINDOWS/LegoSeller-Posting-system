@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.auth import require_auth
 from app.core.database import get_db
 from app.models.listing import Listing
-from app.schemas.listing import LegoCondition, ListingRead, RecognitionRead
+from app.schemas.listing import LegoCondition, ListingPricesUpdate, ListingRead, RecognitionRead
 from app.services.ai_vision import AIConfigurationError, AIProviderError, analyze_images
 
 router = APIRouter(prefix="/listings", tags=["listings"], dependencies=[Depends(require_auth)])
@@ -40,6 +40,9 @@ def _listing_response(listing: Listing) -> dict[str, object]:
         "has_box": listing.has_box,
         "has_manual": listing.has_manual,
         "recommended_price_cents": listing.recommended_price_cents,
+        "retail_price_cents": listing.retail_price_cents,
+        "vinted_price_cents": listing.vinted_price_cents,
+        "marktplaats_price_cents": listing.marktplaats_price_cents,
         "status": listing.status,
         "theme": listing.theme,
         "description": listing.description,
@@ -115,6 +118,24 @@ def delete_listing(listing_id: int, db: Session = Depends(get_db)) -> None:
         shutil.rmtree(listing_dir)
 
 
+@router.patch("/{listing_id}/prices", response_model=ListingRead)
+def update_listing_prices(
+    listing_id: int,
+    prices: ListingPricesUpdate,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    listing = db.get(Listing, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Advertentie niet gevonden.")
+    listing.retail_price_cents = prices.retail_price_cents
+    listing.vinted_price_cents = prices.vinted_price_cents
+    listing.marktplaats_price_cents = prices.marktplaats_price_cents
+    listing.recommended_price_cents = prices.vinted_price_cents
+    db.commit()
+    db.refresh(listing)
+    return _listing_response(listing)
+
+
 @router.post("/{listing_id}/analyze", response_model=RecognitionRead)
 async def analyze_listing(listing_id: int, db: Session = Depends(get_db)) -> RecognitionRead:
     listing = db.get(Listing, listing_id)
@@ -141,6 +162,10 @@ async def analyze_listing(listing_id: int, db: Session = Depends(get_db)) -> Rec
     listing.set_name = recognition.set_name or listing.set_name
     listing.theme = recognition.theme
     listing.description = recognition.description
+    listing.recommended_price_cents = recognition.recommended_price_cents
+    listing.retail_price_cents = recognition.retail_price_cents
+    listing.vinted_price_cents = recognition.vinted_price_cents
+    listing.marktplaats_price_cents = recognition.marktplaats_price_cents
     if recognition.condition in {item.value for item in LegoCondition}:
         listing.condition = recognition.condition
     db.commit()

@@ -39,7 +39,12 @@ async def analyze_images(image_paths: list[Path]) -> LegoRecognition:
                 "Analyseer deze LEGO-foto's. Lees zichtbare tekst op dozen of handleidingen "
                 "met OCR. Geef uitsluitend JSON terug met de velden set_number, set_name, "
                 "theme, condition en description. Gebruik null als iets niet betrouwbaar "
-                "herkenbaar is. condition moet new, excellent, good of used zijn. "
+                "herkenbaar is. Geef ook retail_price_cents, vinted_price_cents en "
+                "marktplaats_price_cents als gehele getallen in eurocenten. retail is de "
+                "geschatte nieuwprijs/referentie; vinted en marktplaats zijn realistische "
+                "vraagprijzen en mogen verschillen. Gebruik null als een prijs niet "
+                "betrouwbaar kan worden geschat. "
+                "condition moet new, excellent, good of used zijn. "
                 "Schrijf description in het Nederlands als een aantrekkelijke maar eerlijke "
                 "Marktplaats/Vinted-advertentietekst van maximaal 600 tekens. Vermeld alleen "
                 "feiten die uit de foto's of de opdracht blijken en verzin geen accessoires, "
@@ -94,4 +99,23 @@ async def analyze_images(image_paths: list[Path]) -> LegoRecognition:
         theme=result.get("theme"),
         condition=result.get("condition"),
         description=result.get("description"),
+        recommended_price_cents=_price_in_cents(result.get("vinted_price_cents")),
+        retail_price_cents=_price_in_cents(result.get("retail_price_cents")),
+        vinted_price_cents=_price_in_cents(result.get("vinted_price_cents")),
+        marktplaats_price_cents=_price_in_cents(result.get("marktplaats_price_cents")),
     )
+
+
+def _price_in_cents(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float):
+        return round(value * 100) if value >= 0 else None
+    if isinstance(value, str):
+        try:
+            return _price_in_cents(float(value.replace(",", ".")))
+        except ValueError:
+            return None
+    return None

@@ -9,6 +9,10 @@ class LegoRecognition:
     theme: str | None = None
     condition: str | None = None
     description: str | None = None
+    recommended_price_cents: int | None = None
+    retail_price_cents: int | None = None
+    vinted_price_cents: int | None = None
+    marktplaats_price_cents: int | None = None
 
 
 class VisionProvider:

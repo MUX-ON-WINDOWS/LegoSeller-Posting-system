@@ -37,3 +37,7 @@ def init_db() -> None:
         if "description" not in columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE listings ADD COLUMN description VARCHAR(4000)"))
+        for column in ("retail_price_cents", "vinted_price_cents", "marktplaats_price_cents"):
+            if column not in columns:
+                with engine.begin() as connection:
+                    connection.execute(text(f"ALTER TABLE listings ADD COLUMN {column} INTEGER"))

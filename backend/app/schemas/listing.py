@@ -25,6 +25,9 @@ class ListingRead(ListingCreate):
     id: int
     status: str
     recommended_price_cents: int | None = None
+    retail_price_cents: int | None = None
+    vinted_price_cents: int | None = None
+    marktplaats_price_cents: int | None = None
     theme: str | None = None
     description: str | None = None
     photos: list[str] = Field(default_factory=list)
@@ -36,3 +39,12 @@ class RecognitionRead(BaseModel):
     theme: str | None = None
     condition: str | None = None
     description: str | None = None
+    retail_price_cents: int | None = None
+    vinted_price_cents: int | None = None
+    marktplaats_price_cents: int | None = None
+
+
+class ListingPricesUpdate(BaseModel):
+    retail_price_cents: int | None = Field(default=None, ge=0)
+    vinted_price_cents: int | None = Field(default=None, ge=0)
+    marktplaats_price_cents: int | None = Field(default=None, ge=0)

@@ -25,6 +25,9 @@ class Listing(Base):
     has_box: Mapped[bool] = mapped_column(default=False)
     has_manual: Mapped[bool] = mapped_column(default=False)
     recommended_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    retail_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    vinted_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    marktplaats_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[ListingStatus] = mapped_column(
         Enum(ListingStatus), default=ListingStatus.ACTIVE
     )

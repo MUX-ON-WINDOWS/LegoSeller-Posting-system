@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { ArrowLeft, BarChart3, Check, CircleDollarSign, Copy, ExternalLink, ImagePlus, LayoutDashboard, LockKeyhole, LogOut, PackagePlus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowLeft, BarChart3, Check, CircleDollarSign, Copy, ExternalLink, ImagePlus, LayoutDashboard, List, LockKeyhole, LogOut, Menu, PackagePlus, Sparkles, Trash2, X } from "lucide-react";
 
 type Listing = {
   id: number;
@@ -8,6 +8,10 @@ type Listing = {
   set_name: string | null;
   theme: string | null;
   description: string | null;
+  recommended_price_cents: number | null;
+  retail_price_cents: number | null;
+  vinted_price_cents: number | null;
+  marktplaats_price_cents: number | null;
   condition: string;
   is_complete: boolean;
   has_box: boolean;
@@ -52,7 +56,11 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
-  const [copiedDescription, setCopiedDescription] = useState(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [prices, setPrices] = useState({ retail: "", vinted: "", marktplaats: "" });
+  const [savingPrices, setSavingPrices] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [page, setPage] = useState<"dashboard" | "listings">("dashboard");
 
   useEffect(() => {
     fetch(`${apiUrl}/auth/me`, { credentials: "include" })
@@ -93,13 +101,13 @@ export default function App() {
     setSelectedListing(null);
   }
 
-  async function copyDescription(description: string) {
+  async function copyText(field: string, text: string) {
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(description);
+        await navigator.clipboard.writeText(text);
       } else {
         const textArea = document.createElement("textarea");
-        textArea.value = description;
+        textArea.value = text;
         textArea.style.position = "fixed";
         textArea.style.opacity = "0";
         document.body.appendChild(textArea);
@@ -107,10 +115,52 @@ export default function App() {
         document.execCommand("copy");
         textArea.remove();
       }
-      setCopiedDescription(true);
-      window.setTimeout(() => setCopiedDescription(false), 2000);
+
+      setCopiedField(field);
+      window.setTimeout(() => setCopiedField(null), 2000);
     } catch {
       setMessage("Beschrijving kopiëren is mislukt.");
+    }
+
+  }
+
+  useEffect(() => {
+    if (!selectedListing) return;
+    const euros = (cents: number | null) => cents == null ? "" : (cents / 100).toFixed(2).replace(".", ",");
+    setPrices({
+      retail: euros(selectedListing.retail_price_cents),
+      vinted: euros(selectedListing.vinted_price_cents),
+      marktplaats: euros(selectedListing.marktplaats_price_cents),
+    });
+  }, [selectedListing]);
+
+  async function savePrices() {
+    if (!selectedListing) return;
+    const cents = (value: string) => {
+      const parsed = Number.parseFloat(value.replace(",", "."));
+      return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : null;
+    };
+    setSavingPrices(true);
+    try {
+      const response = await fetch(`${apiUrl}/listings/${selectedListing.id}/prices`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          retail_price_cents: cents(prices.retail),
+          vinted_price_cents: cents(prices.vinted),
+          marktplaats_price_cents: cents(prices.marktplaats),
+        }),
+      });
+      if (!response.ok) throw new Error("Prijzen opslaan is mislukt.");
+      const updated = await response.json() as Listing;
+      setSelectedListing(updated);
+      setListings((current) => current.map((listing) => listing.id === updated.id ? updated : listing));
+      setMessage("Prijzen opgeslagen.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Prijzen opslaan is mislukt.");
+    } finally {
+      setSavingPrices(false);
     }
   }
 
@@ -188,6 +238,12 @@ export default function App() {
 
   const activeListings = listings.filter((listing) => listing.status === "active");
   const openPlatform = (url: string) => window.open(url, "_blank", "noopener,noreferrer");
+  const navigate = (nextPage: "dashboard" | "listings") => {
+    setPage(nextPage);
+    setShowForm(false);
+    setSelectedListing(null);
+    setMobileMenuOpen(false);
+  };
 
   if (authenticated === null) {
     return <div className="grid min-h-screen place-items-center bg-slate-50 text-slate-500">Laden...</div>;
@@ -242,9 +298,12 @@ export default function App() {
           LegoSell <span className="text-blue-600">AI</span>
         </div>
         <nav className="mt-12 space-y-2 text-sm font-medium">
-          <a className="flex items-center gap-3 rounded-xl bg-blue-50 px-4 py-3 text-blue-700" href="#">
+          <button onClick={() => navigate("dashboard")} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left ${page === "dashboard" ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}>
             <LayoutDashboard size={18} /> Dashboard
-          </a>
+          </button>
+          <button onClick={() => navigate("listings")} className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left ${page === "listings" ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}>
+            <List size={18} /> Advertenties
+          </button>
           <button onClick={openForm} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-slate-500 hover:bg-slate-50">
             <PackagePlus size={18} /> Nieuwe advertentie
           </button>
@@ -252,13 +311,28 @@ export default function App() {
       </aside>
 
       <main className="lg:ml-64">
-        <header className="border-b border-slate-200 bg-white px-6 py-5 sm:px-10">
-          <p className="text-sm font-medium text-blue-600">{showForm ? "Nieuwe advertentie" : "Overzicht"}</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">{showForm ? "Advertentie toevoegen" : "Jouw LEGO advertenties"}</h1>
-          <button type="button" onClick={logout} className="mt-3 flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900"><LogOut size={16} /> Uitloggen</button>
+        <header className="relative border-b border-slate-200 bg-white px-4 py-4 sm:px-10 sm:py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-blue-600">{showForm ? "Nieuwe advertentie" : page === "listings" ? "Advertentiebeheer" : "Overzicht"}</p>
+              <h1 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">{showForm ? "Advertentie toevoegen" : page === "listings" ? "Mijn advertenties" : "Jouw LEGO advertenties"}</h1>
+            </div>
+            <button type="button" onClick={() => setMobileMenuOpen((open) => !open)} className="rounded-xl p-2 text-slate-600 hover:bg-slate-100 lg:hidden" aria-label="Menu openen">
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+          <button type="button" onClick={logout} className="mt-3 hidden items-center gap-2 text-sm text-slate-500 hover:text-slate-900 sm:flex"><LogOut size={16} /> Uitloggen</button>
+          {mobileMenuOpen && (
+            <div className="absolute inset-x-4 top-full z-20 mt-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl lg:hidden">
+              <button type="button" onClick={() => navigate("dashboard")} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium hover:bg-slate-50"><LayoutDashboard size={18} /> Dashboard</button>
+              <button type="button" onClick={() => navigate("listings")} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium hover:bg-slate-50"><List size={18} /> Mijn advertenties</button>
+              <button type="button" onClick={() => { openForm(); setMobileMenuOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium hover:bg-slate-50"><PackagePlus size={18} /> Nieuwe advertentie</button>
+              <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-red-600 hover:bg-red-50"><LogOut size={18} /> Uitloggen</button>
+            </div>
+          )}
         </header>
-        <div className="mx-auto max-w-7xl space-y-8 p-6 sm:p-10">
-          {!showForm && (
+        <div className="mx-auto max-w-7xl space-y-8 p-4 pb-24 sm:p-10 sm:pb-10">
+          {!showForm && page === "dashboard" && (
             <section className="grid gap-4 md:grid-cols-3">
               {[
                 { label: "Actieve advertenties", value: String(activeListings.length), icon: LayoutDashboard },
@@ -319,18 +393,63 @@ export default function App() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-blue-600">{selectedListing.theme ?? "LEGO"} {selectedListing.set_number && `• ${selectedListing.set_number}`}</p>
-                      <h2 className="mt-2 text-2xl font-bold">{selectedListing.set_name ?? "Onbenoemde LEGO-set"}</h2>
+                      <div className="mt-2 flex items-start justify-between gap-3">
+                        <h2 className="text-2xl font-bold">{selectedListing.set_name ?? "Onbenoemde LEGO-set"}</h2>
+                        {selectedListing.set_name && (
+                          <button type="button" onClick={() => copyText("title", selectedListing.set_name!)} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-700">
+                            {copiedField === "title" ? <Check size={14} /> : <Copy size={14} />}
+                            {copiedField === "title" ? "Gekopieerd" : "Titel"}
+                          </button>
+                        )}
+                      </div>
+                      {selectedListing.set_number && (
+                        <button type="button" onClick={() => copyText("set-number", selectedListing.set_number!)} className="mt-3 flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900">
+                          {copiedField === "set-number" ? <Check size={14} /> : <Copy size={14} />}
+                          Setnummer: {selectedListing.set_number} {copiedField === "set-number" ? "· Gekopieerd" : "· Kopiëren"}
+                        </button>
+                      )}
+                      {selectedListing.recommended_price_cents != null && (
+                        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">AI-prijsadvies</p>
+                          <div className="mt-1 flex items-center justify-between gap-3">
+                            <p className="text-sm text-amber-800">Schatting; pas aan indien nodig.</p>
+                          </div>
+                          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                            {([
+                              ["retail", "Retailreferentie"],
+                              ["vinted", "Vinted"],
+                              ["marktplaats", "Marktplaats"],
+                            ] as const).map(([key, label]) => (
+                              <label key={key} className="text-xs font-semibold text-slate-600">
+                                {label}
+                                <div className="mt-1 flex items-center rounded-lg border border-amber-200 bg-white">
+                                  <span className="pl-2 text-slate-400">€</span>
+                                  <input value={prices[key]} onChange={(event) => setPrices((current) => ({ ...current, [key]: event.target.value }))} inputMode="decimal" className="w-full rounded-lg px-2 py-2 text-sm outline-none" />
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button type="button" onClick={savePrices} disabled={savingPrices} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700 disabled:opacity-60">{savingPrices ? "Opslaan..." : "Prijzen opslaan"}</button>
+                            {(["vinted", "marktplaats"] as const).map((key) => (
+                              prices[key] && <button key={key} type="button" onClick={() => copyText(`price-${key}`, prices[key])} className="flex items-center gap-1 rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:border-amber-400">
+                                {copiedField === `price-${key}` ? <Check size={14} /> : <Copy size={14} />} {copiedField === `price-${key}` ? "Gekopieerd" : `${key === "vinted" ? "Vinted" : "Marktplaats"} kopiëren`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                                       {selectedListing.description && (
                                         <div className="mt-6 rounded-xl bg-slate-50 p-4">
                                           <div className="flex items-center justify-between gap-3">
                                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">AI-beschrijving</p>
                                             <button
                                               type="button"
-                                              onClick={() => copyDescription(selectedListing.description!)}
+                                              onClick={() => copyText("description", selectedListing.description!)}
                                               className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-blue-300 hover:text-blue-700"
                                             >
-                                              {copiedDescription ? <Check size={14} /> : <Copy size={14} />}
-                                              {copiedDescription ? "Gekopieerd" : "Kopiëren"}
+                                              {copiedField === "description" ? <Check size={14} /> : <Copy size={14} />}
+                                              {copiedField === "description" ? "Gekopieerd" : "Kopiëren"}
                                             </button>
                                           </div>
                                           <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{selectedListing.description}</p>
@@ -376,6 +495,17 @@ export default function App() {
             </section>
           )}
         </div>
+        <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-slate-200 bg-white/95 p-2 shadow-lg backdrop-blur lg:hidden">
+          <button type="button" onClick={() => navigate("dashboard")} className={`flex flex-col items-center gap-1 rounded-xl py-2 text-xs font-medium ${page === "dashboard" && !showForm ? "text-blue-700" : "text-slate-500"}`}>
+            <LayoutDashboard size={20} /> Dashboard
+          </button>
+          <button type="button" onClick={() => navigate("listings")} className={`flex flex-col items-center gap-1 rounded-xl py-2 text-xs font-medium ${page === "listings" && !showForm ? "text-blue-700" : "text-slate-500"}`}>
+            <List size={20} /> Advertenties
+          </button>
+          <button type="button" onClick={() => { setPage("dashboard"); openForm(); }} className={`flex flex-col items-center gap-1 rounded-xl py-2 text-xs font-medium ${showForm ? "text-blue-700" : "text-slate-500"}`}>
+            <PackagePlus size={20} /> Nieuwe
+          </button>
+        </nav>
       </main>
     </div>
   );
