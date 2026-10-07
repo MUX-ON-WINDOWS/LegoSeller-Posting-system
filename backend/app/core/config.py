@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +28,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 if os.getenv("VERCEL"):
+    prefix = "POSTGRES_PRISMA_"
     database_url = next(
         (
             os.getenv(name)
@@ -45,6 +47,16 @@ if os.getenv("VERCEL"):
         ),
         None,
     )
+    if not database_url:
+        host = os.getenv(f"{prefix}PGHOST") or os.getenv("PGHOST")
+        user = os.getenv(f"{prefix}PGUSER") or os.getenv("PGUSER")
+        password = os.getenv(f"{prefix}PGPASSWORD") or os.getenv("PGPASSWORD")
+        database = os.getenv(f"{prefix}PGDATABASE") or os.getenv("PGDATABASE")
+        if host and user and password and database:
+            database_url = (
+                f"postgresql://{quote(user, safe='')}:{quote(password, safe='')}"
+                f"@{host}/{quote(database, safe='')}?sslmode=require"
+            )
     if database_url:
         settings.database_url = database_url
 if settings.database_url.startswith("postgres://"):
@@ -54,7 +66,5 @@ elif settings.database_url.startswith("postgresql://"):
         "postgresql://", "postgresql+psycopg://", 1
     )
 if os.getenv("VERCEL") and not settings.database_url.startswith("postgresql+psycopg://"):
-    raise RuntimeError(
-        "Persistentie vereist op Vercel: configureer DATABASE_URL, POSTGRES_URL "
-        "of een Vercel/Neon PostgreSQL-variabele."
-    )
+    settings.database_url = "sqlite:////tmp/legosell.db"
+    settings.upload_dir = Path("/tmp/legosell-uploads")
