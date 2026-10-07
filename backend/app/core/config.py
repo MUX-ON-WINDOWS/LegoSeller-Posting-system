@@ -36,6 +36,10 @@ if os.getenv("VERCEL"):
                 "POSTGRES_PRISMA_URL",
                 "POSTGRES_URL_NON_POOLING",
                 "DATABASE_URL_UNPOOLED",
+                "POSTGRES_PRISMA_POSTGRES_URL",
+                "POSTGRES_PRISMA_POSTGRES_URL_NON_POOLING",
+                "POSTGRES_PRISMA_DATABASE_URL",
+                "POSTGRES_PRISMA_DATABASE_URL_UNPOOLED",
             )
             if os.getenv(name)
         ),
