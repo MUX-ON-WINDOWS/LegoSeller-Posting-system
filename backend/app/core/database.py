@@ -3,6 +3,7 @@ from collections.abc import Generator
 
 from fastapi import HTTPException, status
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -15,23 +16,13 @@ class Base(DeclarativeBase):
     pass
 
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-try:
-    engine = create_engine(
-        settings.database_url,
-        connect_args=connect_args,
-        pool_pre_ping=True,
-    )
-except SQLAlchemyError:
-    logger.exception("Databaseconfiguratie is ongeldig; authenticatie blijft beschikbaar.")
-    settings.persistent_storage_configured = False
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+engine: Engine | None = None
+SessionLocal = sessionmaker(autoflush=False, autocommit=False)
 database_available = False
 
 
 def get_db() -> Generator[Session, None, None]:
-    if not settings.persistent_storage_configured or not database_available:
+    if not settings.persistent_storage_configured or not database_available or engine is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
@@ -39,15 +30,23 @@ def get_db() -> Generator[Session, None, None]:
                 "en de verbinding met de PostgreSQL-database."
             ),
         )
-    with SessionLocal() as session:
+    with SessionLocal(bind=engine) as session:
         yield session
 
 
 def init_db() -> None:
-    global database_available
+    global database_available, engine
     if not settings.persistent_storage_configured:
         return
     try:
+        connect_args = (
+            {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+        )
+        engine = create_engine(
+            settings.database_url,
+            connect_args=connect_args,
+            pool_pre_ping=True,
+        )
         from app.models import listing  # noqa: F401
 
         if settings.database_url.startswith("sqlite:///"):
@@ -69,6 +68,7 @@ def init_db() -> None:
                     with engine.begin() as connection:
                         connection.execute(text(f"ALTER TABLE listings ADD COLUMN {column} INTEGER"))
         database_available = True
-    except SQLAlchemyError:
+    except (ModuleNotFoundError, SQLAlchemyError):
         database_available = False
+        engine = None
         logger.exception("Database initialisatie mislukt; authenticatie blijft beschikbaar.")
