@@ -70,14 +70,14 @@ Stoppen kan met `Ctrl+C`.
 
 ### Deployen met Vercel
 
-Deze repository bevat een `vercel.json` die de frontend als statische Vite-build en de
-backend als Python Function bouwt:
+Deze repository bevat een `vercel.json` die de frontend als statische Vite-build bouwt
+en `/api/*` naar de Python Function doorstuurt:
 
 - `frontend`: Vite-build op `/`
 - `api/index.py`: FastAPI op `/api/*`
 
-De root [`requirements.txt`](requirements.txt) importeert de backend-dependencies uit
-`backend/requirements.txt`, zodat Vercel de Python Function volledig kan bouwen.
+De root [`requirements.txt`](requirements.txt) bevat de dependencies van de Python
+Function, zodat Vercel de backend volledig kan bouwen.
 
 Importeer de repository in Vercel en laat de project-root op de repository-root staan.
 Vercel bouwt beide onderdelen samen. Voeg in de Vercel Project Settings de volgende
