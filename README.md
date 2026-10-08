@@ -68,19 +68,20 @@ Stoppen kan met `Ctrl+C`.
 
 `npm start` gebruikt geen Docker en heeft geen extra globale npm-tools nodig.
 
-### Deployen met Vercel Services
+### Deployen met Vercel
 
-Deze repository bevat een `vercel.json` met twee services binnen één Vercel-project:
+Deze repository bevat een `vercel.json` die de frontend als statische Vite-build en de
+backend als Python Function bouwt:
 
 - `frontend`: Vite-build op `/`
-- `backend`: FastAPI op `/api/*`
+- `api/index.py`: FastAPI op `/api/*`
 
-De backend heeft een expliciet Vercel-entrypoint in `backend/main.py` en dependencies in
-`backend/requirements.txt`.
+De root [`requirements.txt`](requirements.txt) importeert de backend-dependencies uit
+`backend/requirements.txt`, zodat Vercel de Python Function volledig kan bouwen.
 
 Importeer de repository in Vercel en laat de project-root op de repository-root staan.
-Vercel bouwt beide services samen. Voeg in de Vercel Project Settings de volgende
-environment variables toe voor de backend:
+Vercel bouwt beide onderdelen samen. Voeg in de Vercel Project Settings de volgende
+environment variables toe voor de backend en redeploy daarna:
 
 ```text
 GOOGLE_AI_API_KEY
